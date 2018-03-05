@@ -6,8 +6,7 @@ const mqtt = require("mqtt")
 
 async function createWeb2Pix() {
 
-    const browser = await puppeteer.launch({headless: false});
-    //const browser = await puppeteer.launch();
+    const browser = await puppeteer.launch();
 
     let cnt = 0;
 
@@ -17,19 +16,6 @@ async function createWeb2Pix() {
             png.decodePixels(pixels => resolve(pixels));
         });
     }
-
-    // function decodePngBuffer(buffer) {
-    //     return new Promise((resolve, reject) => {
-    //         new PNG.PNG({ filterType:4 }).parse( buffer, function(error, data)
-    //         {
-    //             if (error) {
-    //                 reject(error);
-    //             } else {
-    //                 resolve(data.data);
-    //             }
-    //         });                    
-    //     });
-    // }
 
     return {
         async watchPage(url, width, height, cb) {
@@ -98,9 +84,8 @@ async function createDisplay(client, address) {
             let buffer = [];
 
             function write(last, ...bytes) {
-                buffer = buffer.concat(buffer, bytes);
-                if (buffer.length > 100 || last) {                    
-                    //console.info(first, last, buffer);
+                buffer = buffer.concat(bytes);
+                if (buffer.length > 1000 || last) {                    
 
                     function send(message) {
                         console.info(message);
@@ -133,12 +118,12 @@ async function createDisplay(client, address) {
 
             function flushRpt(last) {
                 if (rptCount > 1) {
-                    write(last, 1, rptCount >> 8, rptCount & 0xFF, pixels[rptIndex], pixels[rptIndex + 1], pixels[rptIndex + 2]);
+                    write(last, 1, rptCount >> 8, rptCount & 0xFF, pixels[rptIndex + 2], pixels[rptIndex + 1], pixels[rptIndex]);
                 } else {
-                    if (pixels[rptIndex] === 1) {
-                        write(last, 1, 0, 0, pixels[rptIndex + 1], pixels[rptIndex + 2]);
+                    if (pixels[rptIndex + 2] === 1) {
+                        write(last, 1, 0, 0, pixels[rptIndex + 1], pixels[rptIndex]);
                     } else {
-                        write(last, pixels[rptIndex], pixels[rptIndex + 1], pixels[rptIndex + 2]);
+                        write(last, pixels[rptIndex + 2], pixels[rptIndex + 1], pixels[rptIndex]);
                     }
                 }
             }
@@ -176,8 +161,10 @@ async function test() {
 
         const display = await createDisplay(client, "esp8266_115CC6");
 
-        //let url = "https://www.google.cz/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png";
-        let url = "https://static1.squarespace.com/static/5841944cf7e0ab4b3cc18ae4/t/5841a14c725e25c7bd5cb08d/1480696142541/Rectangle+Copy.png?format=1500w";
+        let url = "http://www.clocktab.com/";
+        //let url = "https://static1.squarespace.com/static/5841944cf7e0ab4b3cc18ae4/t/5841a14c725e25c7bd5cb08d/1480696142541/Rectangle+Copy.png?format=1500w";
+        //let url = "http://www.clker.com/cliparts/X/0/I/1/B/2/color-spectrum-md.png";
+        
         web2pix.watchPage(url, 128, 128, async change => {
             console.info("Change", change);
             await display.update(change);
