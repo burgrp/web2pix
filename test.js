@@ -21,42 +21,50 @@ async function createWeb2Pix() {
         async watchPage(url, width, height, cb) {
 
             const page = await browser.newPage();
-            page.setViewport({ width, height })
-            page.goto(url);
+            await page.setViewport({ width, height })
+            await page.goto(url);
 
             let lastPixels;
+            let lastContent;
 
             async function check() {
                 try {
-                    let pixels = await decodePngBuffer(await page.screenshot({ type: "png" }));
+                    let content = await page.content();
 
-                    let x1, y1, x2, y2;
+                    if (content !== lastContent) {
+                        lastContent = content;
 
-                    if (lastPixels) {
-                        for (let y = 0; y < height; y++) {
-                            for (let x = 0; x < width; x++) {
-                                for (let b = 0; b < 4; b++) {
-                                    let index = (y * width + x) * 4 + b;
-                                    if (pixels[index] !== lastPixels[index]) {
-                                        if (x1 == undefined || x < x1) x1 = x;
-                                        if (y1 == undefined || y < y1) y1 = y;
-                                        if (x2 == undefined || x > x2) x2 = x;
-                                        if (y2 == undefined || y > y2) y2 = y;
+                        let pixels = await decodePngBuffer(await page.screenshot({ type: "png" }));
+
+                        let x1, y1, x2, y2;
+
+                        if (lastPixels) {
+                            for (let y = 0; y < height; y++) {
+                                for (let x = 0; x < width; x++) {
+                                    for (let b = 0; b < 4; b++) {
+                                        let index = (y * width + x) * 4 + b;
+                                        if (pixels[index] !== lastPixels[index]) {
+                                            if (x1 == undefined || x < x1) x1 = x;
+                                            if (y1 == undefined || y < y1) y1 = y;
+                                            if (x2 == undefined || x > x2) x2 = x;
+                                            if (y2 == undefined || y > y2) y2 = y;
+                                        }
                                     }
                                 }
                             }
+                        } else {
+                            x1 = 0;
+                            y1 = 0;
+                            x2 = width - 1;
+                            y2 = height - 1;
                         }
-                    } else {
-                        x1 = 0;
-                        y1 = 0;
-                        x2 = width - 1;
-                        y2 = height - 1;
-                    }
 
-                    lastPixels = pixels;
+                        lastPixels = pixels;
 
-                    if (x1 !== undefined) {
-                        await cb({ x1, y1, x2, y2, width, height, pixels });
+                        if (x1 !== undefined) {
+                            await cb({ x1, y1, x2, y2, width, height, pixels });
+                        }
+
                     }
 
                 } catch (e) {
@@ -85,10 +93,9 @@ async function createDisplay(client, address) {
 
             function write(last, ...bytes) {
                 buffer = buffer.concat(bytes);
-                if (buffer.length > 1000 || last) {                    
+                if (buffer.length > 1000 || last) {
 
                     function send(message) {
-                        console.info(message);
                         client.publish(address + "/screen/write", Buffer.from(message));
                     }
 
@@ -159,17 +166,17 @@ async function test() {
 
     client.on("connect", async () => {
 
-        const display = await createDisplay(client, "esp8266_115CC6");
+        const display = await createDisplay(client, ["esp8266_115CC6"]);
 
         let url = "http://www.clocktab.com/";
+        //let url = "http://i0.kym-cdn.com/photos/images/original/001/022/354/081.jpeg";
+        //let url = "https://cdn-images-1.medium.com/max/800/1*ewvasjf-pO9d9OE9HcA0Sw.gif";
         //let url = "https://static1.squarespace.com/static/5841944cf7e0ab4b3cc18ae4/t/5841a14c725e25c7bd5cb08d/1480696142541/Rectangle+Copy.png?format=1500w";
         //let url = "http://www.clker.com/cliparts/X/0/I/1/B/2/color-spectrum-md.png";
-        
+
         web2pix.watchPage(url, 128, 128, async change => {
-            console.info("Change", change);
             await display.update(change);
         });
-
     });
 
 }
